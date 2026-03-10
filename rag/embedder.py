@@ -1,48 +1,38 @@
 import os
 import time
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from google import genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_embedding_model():
-    """
-    Initialize and return the Gemini embedding model.
-    """
-    return GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001",
-        google_api_key=os.getenv("GEMINI_API_KEY")
+client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY"),
+    http_options={"api_version": "v1beta"}
+)
+
+EMBEDDING_MODEL = "gemini-embedding-001"
+
+
+def get_embedding(text: str) -> list:
+    result = client.models.embed_content(
+        model=EMBEDDING_MODEL,
+        contents=text
     )
+    return result.embeddings[0].values
 
 
-def embed_chunks_in_batches(chunks: list, batch_size: int = 10) -> list:
-    """
-    Embed chunks in batches to avoid API rate limits.
-    
-    Args:
-        chunks: List of Document objects
-        batch_size: Number of chunks per API call
-        
-    Returns:
-        List of embedding vectors
-    """
-    embeddings_model = get_embedding_model()
+def embed_chunks_in_batches(chunks: list, batch_size: int = 5) -> list:
     all_embeddings = []
-    total_batches = len(chunks) // batch_size + 1
+    total = len(chunks)
 
-    for i in range(0, len(chunks), batch_size):
-        batch = chunks[i : i + batch_size]
-        batch_texts = [chunk.page_content for chunk in batch]
+    for i, chunk in enumerate(chunks):
+        print(f"🔄 Embedding chunk {i+1}/{total}...")
         
-        batch_num = i // batch_size + 1
-        print(f"🔄 Embedding batch {batch_num}/{total_batches}...")
+        embedding = get_embedding(chunk.page_content)
+        all_embeddings.append(embedding)
         
-        # Embed the batch
-        batch_embeddings = embeddings_model.embed_documents(batch_texts)
-        all_embeddings.extend(batch_embeddings)
-        
-        # Small delay to respect rate limits
-        time.sleep(0.5)
-    
+        if (i + 1) % batch_size == 0:
+            time.sleep(1)
+
     print(f"✅ Embedded {len(all_embeddings)} chunks total")
     return all_embeddings
