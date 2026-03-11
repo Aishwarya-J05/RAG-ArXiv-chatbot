@@ -1,25 +1,14 @@
-from rag.pdf_parser import load_and_chunk_pdf
-from rag.embedder import embed_chunks_in_batches, get_embedding
-from rag.vector_store import build_vector_store, save_vector_store, search
+from rag.pipeline import ingest_pdfs, ask
 
-# Load and embed
-chunks = load_and_chunk_pdf('lora.pdf')
-embeddings = embed_chunks_in_batches(chunks[:20])  # test with 20 chunks
+# Ingest (will load from cache since we already saved)
+index, chunks_store = ingest_pdfs(["lora.pdf"])
 
-# Build vector store
-index, chunks_store = build_vector_store(chunks[:20], embeddings)
+# Ask a question
+result = ask("What is LoRA and what problem does it solve?", index, chunks_store)
 
-# Save it
-save_vector_store(index, chunks_store)
+print("\n💬 Answer:")
+print(result["answer"])
 
-# Test search
-query = "What is LoRA and how does it work?"
-query_embedding = get_embedding(query)
-results = search(query_embedding, index, chunks_store, top_k=3)
-
-print("\n🔍 Search Results:")
-for i, r in enumerate(results):
-    print(f"\n--- Result {i+1} ---")
-    print(f"Source: {r['source']}, Page: {r['page']}")
-    print(f"Distance: {r['distance']:.4f}")
-    print(f"Text: {r['text'][:200]}...")
+print("\n📚 Sources:")
+for source in result["sources"]:
+    print(f"  → {source}")
