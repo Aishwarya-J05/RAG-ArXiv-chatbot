@@ -7,3 +7,6 @@ faiss-cpu
 pymupdf
 streamlit
 python-dotenv
+fastapi
+uvicorn
+python-multipart
