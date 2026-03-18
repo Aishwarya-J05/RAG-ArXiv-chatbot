@@ -12,9 +12,16 @@ load_dotenv()
 app = FastAPI(title="RAG ArXiv Chatbot")
 
 # Allow React frontend to talk to this backend
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["http://localhost:5173", "http://localhost:5174"],  # Vite default port
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174"],  # Vite default port
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
