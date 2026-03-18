@@ -29,7 +29,7 @@ export default function ChatInterface() {
     setLoading(true)
 
     try {
-      const res = await axios.post('http://localhost:8000/ask', { question })
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/ask`, { question })
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: res.data.answer,
