@@ -17,7 +17,10 @@ export default function FileUpload({ onFilesUpdate }) {
     const formData = new FormData()
     formData.append('file', file)
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/upload`, formData)
+      // const res = await axios.post(`${import.meta.env.VITE_API_URL}/upload`, formData)
+      // NEW — works locally AND on Vercel
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const res = await axios.post(`${API_URL}/upload`, formData)
       const updatedFiles = res.data.files
       setFiles(updatedFiles)
       onFilesUpdate(updatedFiles)

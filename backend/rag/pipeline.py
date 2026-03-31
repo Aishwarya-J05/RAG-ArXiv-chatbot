@@ -57,16 +57,6 @@ def ingest_pdfs(pdf_paths: list):
 
 
 def build_prompt(question: str, context_chunks: list) -> str:
-    """
-    Build the RAG prompt with retrieved context.
-    
-    Args:
-        question: User's question
-        context_chunks: Retrieved chunks from FAISS
-        
-    Returns:
-        Complete prompt string for Gemini
-    """
     context = ""
     for i, chunk in enumerate(context_chunks):
         context += f"""
@@ -77,7 +67,15 @@ def build_prompt(question: str, context_chunks: list) -> str:
     prompt = f"""You are an expert AI research assistant.
 Answer the question using ONLY the context provided below.
 If the answer is not in the context, say "I don't have enough information in the provided papers to answer this."
-Always cite your sources using the format: (Source: filename, Page X)
+Always cite sources using the format: (Source: filename, Page X)
+
+FORMAT RULES — always follow these:
+- Use **bold** for key terms and important concepts
+- Use bullet points starting with * for lists of features, comparisons, or properties
+- Use numbered lists (1. 2. 3.) for sequential steps or ordered processes
+- Use ## for section headings if the answer has multiple distinct parts
+- Write in short focused paragraphs — never one long unbroken block of text
+- Use `backticks` for technical terms, model names, or parameter names
 
 CONTEXT:
 {context}
@@ -85,7 +83,7 @@ CONTEXT:
 QUESTION: {question}
 
 ANSWER:"""
-    
+
     return prompt
 
 
