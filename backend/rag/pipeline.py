@@ -37,26 +37,25 @@ def get_chunks():
 
 def initialize_pipeline():
     """
-    Called on startup. Loads existing vector store or
-    builds from pre-loaded ArXiv papers.
+    Load vector store from disk.
+    Never re-embeds — vector store is pre-built and committed to repo.
     """
     global _index, _chunks_store
 
     if os.path.exists(f"{VECTOR_STORE_PATH}/index.faiss"):
-        print("✅ Loading existing vector store...")
+        print("✅ Loading pre-built vector store from disk...")
         _index, _chunks_store = load_vector_store(VECTOR_STORE_PATH)
+        print(f"✅ Ready — {len(_chunks_store)} chunks loaded instantly")
         return
 
-    print("🚀 Building vector store from pre-loaded ArXiv papers...")
+    # Fallback: only runs if vector store is missing (should never happen)
+    print("⚠️ No vector store found — building from scratch (one-time only)...")
     chunks = get_preloaded_chunks()
-    if not chunks:
-        print("⚠️ No chunks loaded — vector store empty")
-        return
-
-    embeddings = embed_chunks_in_batches(chunks)
-    _index, _chunks_store = build_vector_store(chunks, embeddings)
-    save_vector_store(_index, _chunks_store, VECTOR_STORE_PATH)
-    print(f"✅ Pipeline ready with {len(_chunks_store)} chunks")
+    if chunks:
+        embeddings = embed_chunks_in_batches(chunks)
+        _index, _chunks_store = build_vector_store(chunks, embeddings)
+        save_vector_store(_index, _chunks_store, VECTOR_STORE_PATH)
+        print(f"✅ Built and saved — {len(_chunks_store)} chunks")
 
 
 def add_to_index(new_chunks: list):

@@ -28,9 +28,9 @@ class QuestionRequest(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize pipeline with pre-loaded ArXiv papers on startup."""
-    print("🚀 Starting RAG pipeline initialization...")
+    print("🚀 Loading pre-built vector store...")
     initialize_pipeline()
+    print("✅ Server ready!")
 
 
 @app.get("/")
