@@ -1,4 +1,6 @@
 import os
+import shutil
+import numpy as np
 from dotenv import load_dotenv
 from google import genai
 from rag.pdf_parser import load_and_chunk_pdf
@@ -9,10 +11,10 @@ from rag.vector_store import (
     load_vector_store,
     search
 )
+from rag.arxiv_fetcher import get_preloaded_chunks, search_and_fetch_arxiv
 
 load_dotenv()
 
-# Gemini client for generation
 client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY"),
     http_options={"api_version": "v1beta"}
@@ -21,39 +23,71 @@ client = genai.Client(
 VECTOR_STORE_PATH = "vector_store"
 LLM_MODEL = "gemini-2.5-flash"
 
+# Global state
+_index = None
+_chunks_store = []
 
-def ingest_pdfs(pdf_paths: list):
+
+def get_index():
+    return _index
+
+def get_chunks():
+    return _chunks_store
+
+
+def initialize_pipeline():
     """
-    Parse, chunk, embed and store PDFs into FAISS.
-    Skips re-embedding if vector store already exists.
-    
-    Args:
-        pdf_paths: List of paths to PDF files
+    Called on startup. Loads existing vector store or
+    builds from pre-loaded ArXiv papers.
     """
-    # Check cache — if already embedded, skip
+    global _index, _chunks_store
+
     if os.path.exists(f"{VECTOR_STORE_PATH}/index.faiss"):
-        print("✅ Vector store already exists. Loading from disk...")
-        return load_vector_store(VECTOR_STORE_PATH)
+        print("✅ Loading existing vector store...")
+        _index, _chunks_store = load_vector_store(VECTOR_STORE_PATH)
+        return
 
-    print("🔄 No cache found. Embedding PDFs from scratch...")
-    
-    all_chunks = []
-    
-    # Load and chunk all PDFs
-    for pdf_path in pdf_paths:
-        chunks = load_and_chunk_pdf(pdf_path)
-        all_chunks.extend(chunks)
-    
-    print(f"📚 Total chunks across all PDFs: {len(all_chunks)}")
-    
-    # Embed all chunks
-    embeddings = embed_chunks_in_batches(all_chunks)
-    
-    # Build and save FAISS index
-    index, chunks_store = build_vector_store(all_chunks, embeddings)
-    save_vector_store(index, chunks_store, VECTOR_STORE_PATH)
-    
-    return index, chunks_store
+    print("🚀 Building vector store from pre-loaded ArXiv papers...")
+    chunks = get_preloaded_chunks()
+    if not chunks:
+        print("⚠️ No chunks loaded — vector store empty")
+        return
+
+    embeddings = embed_chunks_in_batches(chunks)
+    _index, _chunks_store = build_vector_store(chunks, embeddings)
+    save_vector_store(_index, _chunks_store, VECTOR_STORE_PATH)
+    print(f"✅ Pipeline ready with {len(_chunks_store)} chunks")
+
+
+def add_to_index(new_chunks: list):
+    """
+    Add new chunks to existing FAISS index.
+    Used when user uploads a PDF or ArXiv fetches new papers.
+    """
+    global _index, _chunks_store
+
+    if not new_chunks:
+        return
+
+    print(f"➕ Adding {len(new_chunks)} new chunks to index...")
+    new_embeddings = embed_chunks_in_batches(new_chunks)
+    new_vectors = np.array(new_embeddings, dtype=np.float32)
+
+    if _index is None:
+        _index, _chunks_store = build_vector_store(new_chunks, new_embeddings)
+    else:
+        _index.add(new_vectors)
+        _chunks_store.extend(new_chunks)
+
+    save_vector_store(_index, _chunks_store, VECTOR_STORE_PATH)
+    print(f"✅ Index now has {len(_chunks_store)} total chunks")
+
+
+def ingest_pdf(pdf_path: str):
+    """Ingest a user-uploaded PDF into the index."""
+    chunks = load_and_chunk_pdf(pdf_path)
+    add_to_index(chunks)
+    return len(chunks)
 
 
 def build_prompt(question: str, context_chunks: list) -> str:
@@ -64,10 +98,10 @@ def build_prompt(question: str, context_chunks: list) -> str:
 {chunk['text']}
 ---"""
 
-    prompt = f"""You are an expert AI research assistant.
+    prompt = f"""You are an expert AI research assistant specializing in machine learning and AI papers.
 Answer the question using ONLY the context provided below.
 If the answer is not in the context, say "I don't have enough information in the provided papers to answer this."
-Always cite sources using the format: (Source: filename, Page X)
+Always cite your sources using the format: (Source: filename, Page X)
 
 FORMAT RULES — always follow these:
 - Use **bold** for key terms and important concepts
@@ -83,43 +117,58 @@ CONTEXT:
 QUESTION: {question}
 
 ANSWER:"""
-
     return prompt
 
 
-def ask(question: str, index, chunks_store: list) -> dict:
+def ask(question: str, auto_fetch: bool = True) -> dict:
     """
-    Full RAG pipeline: embed question → search → generate answer.
-    
-    Args:
-        question: User's question
-        index: FAISS index
-        chunks_store: List of chunks
-        
-    Returns:
-        Dict with answer and sources
+    Full RAG pipeline:
+    1. Search existing FAISS index
+    2. If results are poor, auto-fetch from ArXiv
+    3. Generate grounded answer
     """
-    # Step 1: Embed the question
+    global _index, _chunks_store
+
+    # If index is empty, try fetching from ArXiv
+    if _index is None or len(_chunks_store) == 0:
+        if auto_fetch:
+            print("📭 Index empty — fetching from ArXiv...")
+            new_chunks = search_and_fetch_arxiv(question)
+            add_to_index(new_chunks)
+        else:
+            return {
+                "answer": "No papers loaded yet. Please upload a PDF or ask a question to trigger ArXiv search.",
+                "sources": []
+            }
+
+    # Search existing index
     query_embedding = get_embedding(question)
-    
-    # Step 2: Retrieve relevant chunks
-    relevant_chunks = search(query_embedding, index, chunks_store, top_k=4)
-    
-    # Step 3: Build prompt
-    prompt = build_prompt(question, relevant_chunks)
-    
-    # Step 4: Generate answer with Gemini
+    results = search(query_embedding, _index, _chunks_store, top_k=4)
+
+    # Check if results are confident enough (distance < 1.5)
+    best_distance = results[0]['distance'] if results else 999
+    print(f"🎯 Best match distance: {best_distance:.4f}")
+
+    if best_distance > 1.2 and auto_fetch:
+        print("🔍 Low confidence — fetching more papers from ArXiv...")
+        new_chunks = search_and_fetch_arxiv(question, max_results=2)
+        if new_chunks:
+            add_to_index(new_chunks)
+            # Re-search with expanded index
+            results = search(query_embedding, _index, _chunks_store, top_k=4)
+
+    # Generate answer
+    prompt = build_prompt(question, results)
     response = client.models.generate_content(
         model=LLM_MODEL,
         contents=prompt
     )
-    
-    # Step 5: Extract sources for citation
+
     sources = list(set([
-        f"{c['source']} (Page {c['page']+1})" 
-        for c in relevant_chunks
+        f"{c['source']} (Page {c['page']+1})"
+        for c in results
     ]))
-    
+
     return {
         "answer": response.text,
         "sources": sources
