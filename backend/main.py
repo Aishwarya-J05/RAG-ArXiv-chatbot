@@ -1,5 +1,6 @@
 import os
 import shutil
+import threading
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -26,11 +27,19 @@ class QuestionRequest(BaseModel):
     question: str
 
 
+def run_initialization():
+    """Run in background thread so server starts immediately."""
+    try:
+        initialize_pipeline()
+    except Exception as e:
+        print(f"❌ Initialization error: {e}")
+
+
 @app.on_event("startup")
 async def startup_event():
-    print("🚀 Loading pre-built vector store...")
-    initialize_pipeline()
-    print("✅ Server ready!")
+    print("🚀 Server starting — pipeline initializing in background...")
+    thread = threading.Thread(target=run_initialization, daemon=True)
+    thread.start()
 
 
 @app.get("/")
@@ -66,6 +75,13 @@ async def ask_question(request: QuestionRequest):
             status_code=400,
             content={"error": "Question cannot be empty"}
         )
+
+    # Still initializing
+    if len(get_chunks()) == 0:
+        return JSONResponse({
+            "answer": "⏳ Still loading papers in the background. Please wait 1-2 minutes and try again.",
+            "sources": []
+        })
 
     result = ask(request.question)
     return JSONResponse({

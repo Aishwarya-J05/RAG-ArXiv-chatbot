@@ -45,7 +45,7 @@ def embed_chunks_in_batches(chunks: list, batch_size: int = 5) -> list:
 
         # Pause every batch to stay under 100/min
         if (i + 1) % batch_size == 0:
-            time.sleep(3)  # 5 chunks per 3s = ~100/min max
+            time.sleep(5)  # 5 chunks per 5s = ~60/min max
 
     print(f"✅ Embedded {len(all_embeddings)} chunks total")
     return all_embeddings

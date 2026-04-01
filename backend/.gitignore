@@ -1,8 +1,9 @@
 uploads/
-# vector_store/
+vector_store/
 __pycache__/
 .env
 venv/
-# *.pkl
-# *.faiss
+*.pkl
+*.faiss
 *.pdf
+*.gitattributes

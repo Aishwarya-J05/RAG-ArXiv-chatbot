@@ -11,11 +11,6 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 PRELOADED_PAPERS = [
     "2106.09685",  # LoRA
     "1706.03762",  # Attention Is All You Need
-    "2203.02155",  # InstructGPT / RLHF
-    "1810.04805",  # BERT
-    "2005.14165",  # GPT-3
-    "2302.13971",  # LLaMA
-    "2305.10601",  # QLoRA
 ]
 
 
