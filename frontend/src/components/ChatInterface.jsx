@@ -8,11 +8,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const SUGGESTED_QUESTIONS = [
   "What is LoRA and how does it work?",
-  "How does RLHF train language models?",
-  "Explain the Transformer architecture",
+  "Explain the Lora architecture",
   "What is QLoRA?",
-  "How does BERT use bidirectional attention?",
-  "What problem does GPT-3 solve?",
 ]
 
 export default function ChatInterface() {
