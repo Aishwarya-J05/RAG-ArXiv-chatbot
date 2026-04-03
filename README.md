@@ -29,9 +29,7 @@ Ask any question about AI/ML research in natural language. The system:
 
 **Example questions:**
 - *"What is the Transformer architecture?"*
-- *"How does RLHF train language models?"*
 - *"What is LoRA and how does it work?"*
-- *"Explain the key idea behind LLaMA"*
 - *"What is QLoRA?"*
 
 ---
