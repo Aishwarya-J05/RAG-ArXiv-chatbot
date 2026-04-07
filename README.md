@@ -16,7 +16,7 @@
 
 ---
 
-## 🧠 What It Does
+## What It Does
 
 Ask any question about AI/ML research in natural language. The system:
 
